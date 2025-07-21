@@ -1,0 +1,10 @@
+Flask
+opencv-python
+face-recognition
+numpy
+pandas
+smtplib
+email
+csv
+json
+dlib
