@@ -1,0 +1,128 @@
+{% extends "common/base.html" %}
+
+{% block title %}Principal Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-5 pt-5">
+    <h2 class="text-center mb-4">Welcome, {{ session['username']|capitalize }}!</h2>
+
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card text-center shadow-sm h-100 d-flex">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    <h5 class="card-title">Manage Faculties</h5>
+                    <p class="card-text text-center">Add, edit, or remove teachers and students.</p>
+                    <a href="{{ url_for('principal.manage_users') }}" class="btn btn-outline-primary w-100">Go</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card text-center shadow-sm h-100 d-flex">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    <h5 class="card-title">Edit Assigned Classes</h5>
+                    <p class="card-text">Modify assigned classes for teachers.</p>
+                    <button class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#editClassesModal">Go</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card text-center shadow-sm h-100 d-flex">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    <h5 class="card-title">Manage Attendance</h5>
+                    <p class="card-text">View and update attendance records.</p>
+                    <a href="{{ url_for('principal.attendance') }}" class="btn btn-outline-warning w-100">Go</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editClassesModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Assigned Classes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editClassesForm" action="/principal/manage_users" method="post">
+                    <input type="hidden" name="edit_classes" value="1">
+
+                    <div class="mb-3">
+                        <label class="form-label">Unique Code of Teacher:</label>
+                        <input type="text" name="user_code" id="editUserCode" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Select Classes:</label>
+                        <div class="row">
+                            {% for class_name in available_classes %}
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="edit-class-{{ loop.index }}" name="assigned_class" value="{{ class_name }}">
+                                    <label class="form-check-label" for="edit-class-{{ loop.index }}">
+                                        {{ class_name }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="confirmEditClasses()">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    function confirmEditClasses() {
+        let userCode = document.getElementById("editUserCode").value.trim();
+        let checkboxes = document.querySelectorAll('input[name="assigned_class"]:checked');
+        let selectedClasses = [];
+    
+        checkboxes.forEach((checkbox) => {
+            selectedClasses.push(checkbox.value);
+        });
+    
+        if (userCode === "") {
+            alert("Please enter the Unique Code of the teacher.");
+            return;
+        }
+    
+        if (selectedClasses.length === 0) {
+            alert("Please select at least one class.");
+            return;
+        }
+    
+        if (confirm("Are you sure you want to update the assigned classes?")) {
+            fetch('/principal/update_classes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_code: userCode,
+                    assigned_classes: selectedClasses.join(";")
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Assigned classes updated successfully!");
+                    location.reload();
+                } else {
+                    alert("Error updating assigned classes.");
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("An error occurred while updating classes.");
+            });
+        }
+    }
+</script>      
+
+{% endblock %}

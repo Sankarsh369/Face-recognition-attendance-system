@@ -1,0 +1,142 @@
+{% extends 'common/base.html' %}
+
+{% block title %}Manage Faculty{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="text-center p-4 fw-bold">Manage Faculty</h2>
+
+    <div class="row">
+        <!-- Add Faculty Form -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="card-title text-success">Add Faculty</h4>
+                    <form id="addUserForm">
+                        <div class="mb-3">
+                            <label class="form-label">Username:</label>
+                            <input type="text" id="username" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Role:</label>
+                            <select id="roleSelect" class="form-select" required>
+                                <option value="teacher">Teacher</option>
+                                <option value="principal">Principal</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Assign Classes (Optional):</label>
+                            <div class="row">
+                                {% for class_name in available_classes %}
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="class-{{ '%02d'|format(loop.index) }}" name="assigned_class" value="{{ class_name }}">
+                                        <label class="form-check-label" for="class-{{ '%02d'|format(loop.index) }}">
+                                            {{ class_name }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>                        
+                        <button type="button" class="btn btn-success w-100" onclick="confirmAddUser()">Add Faculty</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Remove Faculty Form -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="card-title text-danger">Remove Faculty</h4>
+                    <form id="removeUserForm">
+                        <div class="mb-3">
+                            <label class="form-label">Unique Code of User:</label>
+                            <input type="text" id="removeUserCode" class="form-control" required>
+                        </div>
+                        <button type="button" class="btn btn-danger w-100" onclick="confirmRemoveUser()">Remove Faculty</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Existing Faculty Table -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-body">
+            <h4 class="card-title">Existing Faculty</h4>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Unique Code</th>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Assigned Classes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user[0] }}</td>
+                            <td>{{ user[1] }}</td>
+                            <td>{{ user[3] }}</td>
+                            <td>{{ user[4] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmAddUser() {
+        let username = document.getElementById("username").value.trim();
+        let role = document.getElementById("roleSelect").value;
+        
+        let checkboxes = document.querySelectorAll("input[name='assigned_class']:checked");
+        let assignedClasses = Array.from(checkboxes).map(cb => cb.value);
+    
+        if (!username) {
+            alert("Username cannot be empty.");
+            return;
+        }
+    
+        fetch('/principal/manage_users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: "add", username, role, assigned_classes: assignedClasses })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) location.reload();
+        })
+        .catch(error => alert("Error adding user."));
+    }
+    
+    function confirmRemoveUser() {
+        let userCode = document.getElementById("removeUserCode").value.trim();
+        if (!userCode) {
+            alert("Please enter a valid user code.");
+            return;
+        }
+    
+        fetch('/principal/manage_users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: "remove", user_code: userCode })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) location.reload();
+        })
+        .catch(error => alert("Error removing user."));
+    }
+    </script>
+
+{% endblock %}

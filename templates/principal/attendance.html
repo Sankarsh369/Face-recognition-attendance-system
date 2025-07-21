@@ -1,0 +1,75 @@
+{% extends "common/base.html" %}
+
+{% block title %}Principal Dashboard{% endblock %}
+
+{% block content %}
+
+    <!-- Attendance Management -->
+    <div class="container mt-4">
+        <h2 class="text-center mb-4">Manage Attendance</h2>
+
+        <!-- Class & Date Selection -->
+        <form method="GET" class="mb-4">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label for="classSelect" class="form-label">Select Class</label>
+                    <select class="form-select" name="class_name" id="classSelect" required>
+                        <option value="">Choose a class</option>
+                        {% for class in classes %}
+                            <option value="{{ class }}" {% if class == selected_class %}selected{% endif %}>{{ class }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label for="dateSelect" class="form-label">Select Date</label>
+                    <input type="date" class="form-control" name="date" id="dateSelect" value="{{ date }}" required onfocus="this.showPicker()">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Load</button>
+                </div>
+            </div>
+        </form>
+
+        {% if selected_class and date %}
+            <!-- Download Button -->
+            <div class="text-center mb-3">
+                <a href="{{ url_for('principal.download_attendance', class_name=selected_class, date=date) }}" class="btn btn-success">Download Attendance</a>
+            </div>
+        {% endif %}
+
+        {% if attendance_records %}
+        <!-- Attendance Form -->
+        <form method="POST">
+            <h4 class="text-center">Attendance for {{ date }}</h4>
+            <table class="table table-bordered mt-4">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Reg No</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in attendance_records %}
+                    <tr>
+                        <td>{{ row.student_name }}</td>
+                        <td>{{ row.reg_no }}</td>
+                        <td>
+                            <select class="form-select" name="{{ row.student_name }}">
+                                <option value="Present" {% if row.status == 'Present' %}selected{% endif %}>Present</option>
+                                <option value="Absent" {% if row.status == 'Absent' %}selected{% endif %}>Absent</option>
+                            </select>
+                        </td>
+                        <td>{{ row.time }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="submit" class="btn btn-success w-100">Save Changes</button>
+        </form>                
+        {% elif selected_class and date %}
+        <p class="text-center text-danger">No attendance records found for this date and class.</p>
+        {% endif %}
+
+{% endblock %}
