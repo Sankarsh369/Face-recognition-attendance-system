@@ -1,0 +1,144 @@
+{% extends 'common/base.html' %}
+
+{% block title %}Add Student - Face Recognition Attendance{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-center">Add Student to {{ class_name }}</h2>
+
+    <form method="POST" action="{{ url_for('teacher.add_student', class_name=class_name) }}" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="student_name" class="form-label">Student Name:</label>
+            <input type="text" id="student_name" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="reg_no" class="form-label">Registration Number:</label>
+            <input type="text" id="reg_no" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="parent_email" class="form-label">Parent Email:</label>
+            <input type="email" id="parent_email" class="form-control" required>
+        </div>
+    </form>
+
+    <div class="mt-3 text-center">
+        <video id="video" width="400" autoplay class="rounded" style="transform: scaleX(-1);"></video>
+    </div>
+
+    <div class="mt-3 text-center">
+        <button type="button" class="btn btn-primary" id="startCameraBtn" onclick="startCamera()">Start Camera</button>
+        <button type="button" class="btn btn-success" onclick="captureImage()">Capture Face</button>
+        <button type="button" class="btn btn-danger" id="stopCameraBtn" onclick="stopCamera()" disabled>Stop Camera</button>
+    </div>
+
+    <div class="mt-3 text-center">
+        <a href="{{ url_for('teacher.dashboard') }}" class="btn btn-secondary">Back</a>
+    </div>
+    
+</div>
+
+<!-- Bootstrap Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusModalLabel">Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="statusMessage">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let videoStream;
+
+    async function startCamera() {
+        const video = document.getElementById("video");
+
+        if (!video) {
+            showModal("Video element not found!");
+            return;
+        }
+
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = videoStream;
+            
+            document.getElementById("startCameraBtn").disabled = true;
+            document.getElementById("stopCameraBtn").disabled = false;
+        } catch (error) {
+            showModal("Error accessing the camera: " + error.message);
+        }
+    }
+
+    function stopCamera() {
+        const video = document.getElementById("video");
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+        
+        document.getElementById("startCameraBtn").disabled = false;
+        document.getElementById("stopCameraBtn").disabled = true;
+    }
+
+    async function captureImage() {
+        const video = document.getElementById("video");
+        const studentName = document.getElementById("student_name").value.trim();
+        const regNo = document.getElementById("reg_no").value.trim();
+        const parentEmail = document.getElementById("parent_email").value.trim();
+
+        if (!video.srcObject) {
+            showModal("Please start the camera first!");
+            return;
+        }
+
+        if (!studentName || !regNo || !parentEmail) {
+            showModal("Please enter all fields (Student Name, Registration Number, Parent Email).");
+            return;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext("2d");
+        context.translate(canvas.width, 0);
+        context.scale(-1, 1);
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(blob => {
+            const formData = new FormData();
+            formData.append("class_name", "{{ class_name }}");
+            formData.append("student_name", studentName);
+            formData.append("reg_no", regNo);
+            formData.append("parent_email", parentEmail);
+            formData.append("image", blob, "student_face.jpg");
+
+            fetch("/teacher/save_student_face", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showModal(data.message);
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                showModal("❌ Error Saving Image!");
+            });
+        }, "image/jpeg");
+    }
+
+    function showModal(message) {
+        document.getElementById("statusMessage").innerText = message;
+        var statusModal = new bootstrap.Modal(document.getElementById("statusModal"));
+        statusModal.show();
+    }
+    
+</script>
+{% endblock %}

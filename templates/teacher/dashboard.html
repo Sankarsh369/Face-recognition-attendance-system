@@ -1,0 +1,61 @@
+{% extends 'common/base.html' %}
+
+{% block title %}Teacher Dashboard{% endblock %}
+
+{% block content %}
+    <h2 class="p-3 mt-4 text-center">Welcome, {{ session['username']|capitalize}}!</h2>
+
+    <!-- Class and Date Selection -->
+    <div class="card shadow-sm p-4 mt-4">
+        <form method="post" class="row g-3">
+            <div class="col-md-6">
+                <label for="class_name" class="form-label">Select Class:</label>
+                <select name="class_name" class="form-select" required>
+                    {% for class in assigned_classes %}
+                    <option value="{{ class }}" {% if class == selected_class %}selected{% endif %}>{{ class }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="date" class="form-label">Select Date:</label>
+                <input type="date" name="date" class="form-control" value="{{ selected_date }}" required onfocus="this.showPicker()">
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary w-100">Load Class</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Actions (Only show if class & date are selected) -->
+    {% if selected_class and selected_date %}
+    <div class="row mt-5 g-4">
+        <div class="col-md-4">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Mark Attendance</h5>
+                    <p class="card-text">Mark attendance for the selected class.</p>
+                    <a href="{{ url_for('teacher.mark_attendance', class_name=selected_class, date=selected_date) }}" class="btn btn-success w-100">Go</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">View Attendance</h5>
+                    <p class="card-text">Check attendance records for the selected class.</p>
+                    <a href="{{ url_for('teacher.view_attendance', class_name=selected_class, date=selected_date) }}" class="btn btn-info w-100">Go</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Add Student</h5>
+                    <p class="card-text">Enroll a new student in the selected class.</p>
+                    <a href="{{ url_for('teacher.add_student', class_name=selected_class) }}" class="btn btn-warning w-100">Go</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}

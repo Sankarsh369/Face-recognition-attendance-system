@@ -1,0 +1,222 @@
+{% extends "common/base.html" %}
+
+{% block title %}Mark Attendance{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="text-center mb-3">
+        <h3 class="fw-bold">Mark Attendance</h3>
+        <p class="text-muted">Align your face clearly within the frame</p>
+    </div>
+
+    <div id="video-wrapper" class="position-relative mb-4 mx-auto rounded overflow-hidden shadow-sm bg-dark"
+     style="max-width: 720px; width: 100%;">
+        <canvas id="canvas" class="position-absolute top-0 start-0 w-100 h-100" style="z-index: 2; min-width: 100%; min-height: 100%;"></canvas>
+        <video id="video" autoplay playsinline class="w-100 h-100" style="object-fit: cover; transform: scaleX(-1); z-index: 1;"></video>
+    </div>
+
+    <div class="d-flex justify-content-center gap-3 flex-wrap mb-4">
+        <button class="btn btn-outline-secondary shadow-sm" onclick="flipCamera()">🔄 Flip</button>
+        <button class="btn btn-success shadow-sm" onclick="captureFace()">🎯 Scan</button>
+    </div>
+
+    <div id="status" class="text-center px-3 mb-3"></div>
+
+    <div class="text-center">
+        <a href="{{ url_for('teacher.dashboard', class_name=class_name) }}" class="btn btn-outline-dark">← Back</a>
+    </div>
+</div>
+<style>
+    canvas {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover;
+    }
+</style>
+<script defer>
+    let videoStream;
+    let useFrontCamera = true;
+    let isCapturing = false;
+
+    window.addEventListener("DOMContentLoaded", () => startCamera());
+    window.addEventListener("resize", () => {
+        const canvas = document.getElementById("canvas");
+        const video = document.getElementById("video");
+        canvas.width = video.clientWidth;
+        canvas.height = video.clientHeight;
+        drawCircleOverlay();
+    });
+
+    async function startCamera() {
+        const video = document.getElementById("video");
+        const wrapper = document.getElementById("video-wrapper");
+        const canvas = document.getElementById("canvas");
+
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: useFrontCamera ? "user" : "environment" }
+            });
+            video.srcObject = videoStream;
+
+            video.onloadedmetadata = () => {
+                const aspectRatio = video.videoWidth / video.videoHeight;
+                wrapper.style.aspectRatio = aspectRatio;
+
+                video.play();
+                video.style.transform = useFrontCamera ? "scaleX(-1)" : "scaleX(1)";
+
+                canvas.width = video.clientWidth;
+                canvas.height = video.clientHeight;
+
+                isCapturing = true;
+                drawCircleOverlay();
+            };
+        } catch (err) {
+            alert("Camera error: " + err.message);
+        }
+    }
+
+    function drawCircleOverlay() {
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        const displayWidth = canvas.clientWidth;
+        const displayHeight = canvas.clientHeight;
+
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+        if (useFrontCamera) {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+        }
+
+        const x = displayWidth / 2;
+        const y = displayHeight / 2;
+        const radius = Math.min(displayWidth, displayHeight) / 3;
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
+    async function captureFace() {
+        if (!isCapturing) return startCamera();
+
+        const status = document.getElementById("status");
+        status.innerHTML = `<div class='alert alert-info'>⏳ Scanning... <span class='spinner-border spinner-border-sm'></span></div>`;
+
+        const video = document.getElementById("video");
+        const displayCanvas = document.getElementById("canvas");
+        const displayCtx = displayCanvas.getContext("2d");
+
+        const canvasWidth = displayCanvas.clientWidth;
+        const canvasHeight = displayCanvas.clientHeight;
+
+        displayCanvas.width = canvasWidth;
+        displayCanvas.height = canvasHeight;
+
+        displayCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+        displayCtx.setTransform(1, 0, 0, 1, 0, 0);
+        if (useFrontCamera) {
+            displayCtx.translate(canvasWidth, 0);
+            displayCtx.scale(-1, 1);
+        }
+        displayCtx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+        displayCtx.setTransform(1, 0, 0, 1, 0, 0);
+
+        const fullCanvas = document.createElement("canvas");
+        fullCanvas.width = video.videoWidth;
+        fullCanvas.height = video.videoHeight;
+        const fullCtx = fullCanvas.getContext("2d");
+
+        fullCtx.setTransform(1, 0, 0, 1, 0, 0);
+        if (useFrontCamera) {
+            fullCtx.translate(fullCanvas.width, 0);
+            fullCtx.scale(-1, 1);
+        }
+        fullCtx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height);
+
+        const imageBase64 = fullCanvas.toDataURL("image/jpeg");
+
+        stopCamera();
+        video.srcObject = null;
+        isCapturing = false;
+
+        fetch("/teacher/scan_face", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                class_name: "{{ class_name }}",
+                date: "{{ date }}",
+                image: imageBase64
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 200) {
+                const { student_name, reg_no } = data;
+                status.innerHTML = `
+                    <div class='alert alert-warning d-flex align-items-center justify-content-between flex-wrap'>
+                        <span>✅ Is this <strong>${student_name}</strong> (Reg No: ${reg_no})?</span>
+                        <div class='d-flex gap-2 mt-2 mt-sm-0'>
+                            <button class='btn btn-success btn-sm' onclick='confirmAttendance("${student_name}", "${reg_no}", "{{ class_name }}", "{{ date }}")'>Yes</button>
+                            <button class='btn btn-danger btn-sm' onclick='rejectAttendance()'>No</button>
+                        </div>
+                    </div>`;
+            } else {
+                status.innerHTML = `<div class='alert alert-danger'>❌ ${data.message}</div>`;
+                startCamera();
+            }
+        })
+        .catch(() => {
+            status.innerHTML = `<div class='alert alert-danger'>❌ Error scanning face.</div>`;
+            startCamera();
+        });
+    }
+
+    function confirmAttendance(name, reg, cls, date) {
+        fetch("/teacher/confirm_attendance", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ student_name: name, reg_no: reg, class_name: cls, date: date })
+        })
+        .then(res => res.json())
+        .then(data => {
+            const msg = data.status === 200
+                ? `✅ ${name} (Reg No: ${reg}) marked present`
+                : `⚠️ ${name} is already marked present.`;
+            document.getElementById("status").innerHTML = `<div class='alert alert-${data.status === 200 ? 'success' : 'info'}'>${msg}</div>`;
+            startCamera();
+        })
+        .catch(() => {
+            document.getElementById("status").innerHTML = "<div class='alert alert-danger'>❌ Error marking attendance.</div>";
+            startCamera();
+        });
+    }
+
+    function rejectAttendance() {
+        document.getElementById("status").innerHTML = "<div class='alert alert-warning'>⚠️ Attendance not marked.</div>";
+        startCamera();
+    }
+
+    function flipCamera() {
+        useFrontCamera = !useFrontCamera;
+        stopCamera();
+        startCamera();
+    }
+
+    function stopCamera() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+        }
+    }
+</script>
+{% endblock %}
