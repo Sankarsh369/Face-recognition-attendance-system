@@ -1,0 +1,21 @@
+{
+    "users": [
+        {
+            "username": "principal",
+            "password": "hashed_password",
+            "role": "principal"
+        },
+        {
+            "username": "teacher1",
+            "password": "hashed_password",
+            "role": "teacher",
+            "class_assigned": "Class 1"
+        },
+        {
+            "username": "teacher2",
+            "password": "hashed_password",
+            "role": "teacher",
+            "class_assigned": "Class 2"
+        }
+    ]
+}
