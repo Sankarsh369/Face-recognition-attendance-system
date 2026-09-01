@@ -101,10 +101,10 @@
         let assignedClasses = Array.from(checkboxes).map(cb => cb.value);
     
         if (!username) {
-            alert("Username cannot be empty.");
+            showToast("Username cannot be empty.", "danger");
             return;
         }
-    
+
         fetch('/principal/manage_users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -112,30 +112,32 @@
         })
         .then(response => response.json())
         .then(data => {
-            alert(data.message);
+            showToast(data.message, data.success ? "success" : "danger");
             if (data.success) location.reload();
         })
-        .catch(error => alert("Error adding user."));
+        .catch(error => showToast("Error adding user.", "danger"));
     }
-    
+
     function confirmRemoveUser() {
         let userCode = document.getElementById("removeUserCode").value.trim();
         if (!userCode) {
-            alert("Please enter a valid user code.");
+            showToast("Please enter a valid user code.", "danger");
             return;
         }
-    
-        fetch('/principal/manage_users', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: "remove", user_code: userCode })
-        })
-        .then(response => response.json())
-        .then(data => {
-            alert(data.message);
-            if (data.success) location.reload();
-        })
-        .catch(error => alert("Error removing user."));
+
+        showConfirm("Remove this user? This can't be undone.", function () {
+            fetch('/principal/manage_users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "remove", user_code: userCode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showToast(data.message, data.success ? "success" : "danger");
+                if (data.success) location.reload();
+            })
+            .catch(error => showToast("Error removing user.", "danger"));
+        });
     }
     </script>
 

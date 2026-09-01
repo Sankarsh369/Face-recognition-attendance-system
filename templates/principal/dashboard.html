@@ -90,16 +90,16 @@
         });
     
         if (userCode === "") {
-            alert("Please enter the Unique Code of the teacher.");
+            showToast("Please enter the Unique Code of the teacher.", "danger");
             return;
         }
-    
+
         if (selectedClasses.length === 0) {
-            alert("Please select at least one class.");
+            showToast("Please select at least one class.", "danger");
             return;
         }
-    
-        if (confirm("Are you sure you want to update the assigned classes?")) {
+
+        showConfirm("Are you sure you want to update the assigned classes?", function () {
             fetch('/principal/update_classes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -111,17 +111,17 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert("Assigned classes updated successfully!");
+                    showToast("Assigned classes updated successfully!", "success");
                     location.reload();
                 } else {
-                    alert("Error updating assigned classes.");
+                    showToast("Error updating assigned classes.", "danger");
                 }
             })
             .catch(error => {
                 console.error("Error:", error);
-                alert("An error occurred while updating classes.");
+                showToast("An error occurred while updating classes.", "danger");
             });
-        }
+        });
     }
 </script>      
 

@@ -72,7 +72,7 @@
                 drawCircleOverlay();
             };
         } catch (err) {
-            alert("Camera error: " + err.message);
+            showToast("Camera error: " + err.message, "danger");
         }
     }
 
