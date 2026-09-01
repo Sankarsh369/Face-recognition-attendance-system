@@ -5,7 +5,6 @@ from datetime import datetime
 import base64
 import numpy as np
 import cv2
-import dlib
 from email_notifications import send_attendance_email
 
 teacher_bp = Blueprint("teacher", __name__, template_folder="../templates/teacher")
@@ -14,12 +13,17 @@ ATTENDANCE_DIR = os.path.join(DATA_DIR, "attendance")
 FACES_DIR = os.path.join(DATA_DIR, "faces")
 USER_CSV = os.path.join(DATA_DIR, "users.csv")
 STUDENTS_CSV = os.path.join(DATA_DIR, "students.csv")
-LANDMARK_MODEL_PATH = "data/shape_predictor_68_face_landmarks.dat"
-FACE_REC_MODEL_PATH = "data/dlib_face_recognition_resnet_model_v1.dat"
+
+# Face size the LBPH recognizer trains/predicts on. Faces are detected with
+# Haar cascades, cropped, and resized to this before use.
+FACE_SIZE = (200, 200)
+
+# LBPH's "confidence" is actually a distance - lower means a closer match.
+# Anything above this is treated as "not a known student" rather than a
+# (likely wrong) best guess.
+UNKNOWN_CONFIDENCE_THRESHOLD = 75
 
 face_cascade = cv2.CascadeClassifier("data/haarcascade_frontalface_default.xml")
-predictor = dlib.shape_predictor(LANDMARK_MODEL_PATH)
-face_rec = dlib.face_recognition_model_v1(FACE_REC_MODEL_PATH)
 
 os.makedirs(ATTENDANCE_DIR, exist_ok=True)
 os.makedirs(FACES_DIR, exist_ok=True)
@@ -79,7 +83,10 @@ def manage_attendance(class_name, student_name, reg_no, date):
 
     return jsonify({"message": "Attendance marked successfully", "status": 200}), 200
 
-def get_face_encoding(image):
+def extract_face_image(image):
+    """Detect the largest face in `image` and return it as a resized
+    grayscale crop suitable for LBPH training/prediction, or None if no
+    face is found."""
     if image is None or image.size == 0:
         return None
 
@@ -87,47 +94,48 @@ def get_face_encoding(image):
     gray = cv2.equalizeHist(gray)
 
     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
     if len(faces) == 0:
         return None
 
-    x, y, w, h = faces[0]
-    dlib_rect = dlib.rectangle(x, y, x + w, y + h)
-    shape = predictor(gray, dlib_rect)
-    rgb_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    face_encoding = np.array(face_rec.compute_face_descriptor(rgb_img, shape))
-
-    return face_encoding
+    x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+    face = gray[y:y + h, x:x + w]
+    return cv2.resize(face, FACE_SIZE)
 
 def load_faces(class_name):
     faces_path = os.path.join(FACES_DIR, class_name)
     if not os.path.exists(faces_path):
         return [], []
 
-    encodings = []
+    face_images = []
     names = []
     for file in os.listdir(faces_path):
         img_path = os.path.join(faces_path, file)
         img = cv2.imread(img_path)
-        face_enc = get_face_encoding(img)
-        if face_enc is not None:
-            encodings.append(face_enc)
+        face_img = extract_face_image(img)
+        if face_img is not None:
+            face_images.append(face_img)
             names.append(file)
 
-    return encodings, names
+    return face_images, names
 
-def recognize_face(face_encoding, class_name):
-    known_encodings, known_names = load_faces(class_name)
-    if not known_encodings:
+def recognize_face(face_img, class_name):
+    known_faces, known_names = load_faces(class_name)
+    if not known_faces:
         return "unknown", ""
 
-    distances = np.linalg.norm(known_encodings - face_encoding, axis=1)
-    best_match_index = np.argmin(distances)
+    # Trained fresh on every recognition call, same as the old per-call
+    # load_faces() + distance comparison it replaces - fine at the scale of
+    # a single class roster, and it means newly added students are picked
+    # up immediately without a separate "retrain" step.
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+    labels = np.arange(len(known_faces))
+    recognizer.train(known_faces, labels)
 
-    if distances[best_match_index] > 0.4:
+    predicted_label, confidence = recognizer.predict(face_img)
+    if confidence > UNKNOWN_CONFIDENCE_THRESHOLD:
         return "unknown", ""
 
-    student_name_with_regno = known_names[best_match_index]
+    student_name_with_regno = known_names[predicted_label]
     name, reg_no = process_student_name(student_name_with_regno)
     return name, reg_no
 
@@ -259,22 +267,12 @@ def scan_face():
         if img is None:
             return jsonify({"status": 400, "message": "Image decoding failed!"})
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
-        if len(faces) == 0:
+        face_img = extract_face_image(img)
+        if face_img is None:
             return jsonify({"status": 400, "message": "No Face Detected!"})
 
-        x, y, w, h = faces[0]
-        dlib_rect = dlib.rectangle(x, y, x + w, y + h)
-        shape = predictor(gray, dlib_rect)
-        face_encoding = np.array(face_rec.compute_face_descriptor(img, shape))
-
-        if face_encoding is None:
-            return jsonify({"status": 400, "message": "Could not extract face encoding!"})
-
         class_name = request.json.get("class_name", "")
-        student_name, reg_no = recognize_face(face_encoding, class_name)
+        student_name, reg_no = recognize_face(face_img, class_name)
 
         if student_name == "unknown":
             return jsonify({"status": 400, "message": "Student not recognized!"})
