@@ -5,7 +5,7 @@ A web-based attendance system for schools using face recognition. Teachers mark 
 
 ## 🚀 Live demo
 
-[https://face-recognition-attendance.onrender.com](https://face-recognition-attendance.onrender.com)
+[https://face-recognition-attendance-92yo.onrender.com](https://face-recognition-attendance-92yo.onrender.com)
 
 Try it with the seeded demo accounts:
 
